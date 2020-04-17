@@ -19,6 +19,8 @@ class encodable (α : Type*) :=
 (decode [] : nat → option α)
 (encodek : ∀ a, decode (encode a) = some a)
 
+attribute [simp] encodable.encodek
+
 namespace encodable
 variables {α : Type*} {β : Type*}
 universe u
