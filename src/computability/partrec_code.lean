@@ -53,8 +53,8 @@ protected def const : ℕ → code
 
 theorem injective_const : Π {n₁ n₂}, nat.partrec.code.const n₁ = nat.partrec.code.const n₂ → n₁ = n₂
 | 0 0 h := by simp
-| (n₁+1) (n₂+1) h := by { dsimp [nat.partrec.code.const] at h, 
-                          injection h with h₁ h₂, 
+| (n₁+1) (n₂+1) h := by { dsimp [nat.partrec.code.const] at h,
+                          injection h with h₁ h₂,
                           simp only [injective_const h₂] }
 
 protected def id : code := pair left right
@@ -482,8 +482,8 @@ end
 def eval : code → ℕ →. ℕ
 | zero         := pure 0
 | succ         := nat.succ
-| left         := λ n, n.unpair.1
-| right        := λ n, n.unpair.2
+| left         := λ n, roption.some n.unpair.1
+| right        := λ n, roption.some n.unpair.2
 | (pair cf cg) := λ n, mkpair <$> eval cf n <*> eval cg n
 | (comp cf cg) := λ n, eval cg n >>= eval cf
 | (prec cf cg) := nat.unpaired (λ a n,
@@ -513,13 +513,13 @@ comp_prim.comp primrec.fst $
 pair_prim.comp (const_prim.comp primrec.snd) (primrec.const code.id)
 
 theorem injective_curry {c₁ c₂ n₁ n₂} (h : curry c₁ n₁ = curry c₂ n₂) : c₁ = c₂ ∧ n₁ = n₂ :=
-⟨by injection h, by { injection h, 
-                      injection h with h₁ h₂, 
-                      injection h₂ with h₃ h₄, 
+⟨by injection h, by { injection h,
+                      injection h with h₁ h₂,
+                      injection h₂ with h₃ h₄,
                       exact injective_const h₃ }⟩
 
-theorem smn : ∃ f : code → ℕ → code, 
-  computable₂ f ∧ ∀ c n x, eval (f c n) x = eval c (mkpair n x) := 
+theorem smn : ∃ f : code → ℕ → code,
+  computable₂ f ∧ ∀ c n x, eval (f c n) x = eval c (mkpair n x) :=
 ⟨curry, primrec₂.to_comp curry_prim, eval_curry⟩
 
 theorem exists_code {f : ℕ →. ℕ} : nat.partrec f ↔ ∃ c : code, eval c = f :=

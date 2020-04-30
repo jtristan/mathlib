@@ -225,6 +225,9 @@ theorem one_one_equiv.congr_right {α β γ} [primcodable α] [primcodable β] [
   (h : one_one_equiv q r) : one_one_equiv p q ↔ one_one_equiv p r :=
 and_congr h.le_congr_right h.le_congr_left
 
+@[simp] lemma ulower.down_computable {α} [primcodable α] : (ulower.equiv α).computable :=
+⟨primrec.ulower_down.to_comp, primrec.ulower_up.to_comp⟩
+
 local infix ` ⊕' `:1001 := sum.elim
 
 open nat.primrec
@@ -249,59 +252,6 @@ theorem disjoin_le {α β γ} [primcodable α] [primcodable β] [primcodable γ]
   one_one_reducible.disjoin_right.to_many_one.trans h⟩,
  λ ⟨h₁, h₂⟩, disjoin_many_one_reducible h₁ h₂⟩
 
-def ulower (α : Type u) [encodable α] : Type :=
-set.range (encodable.encode : α → ℕ)
-
-namespace ulower
-open encodable
-
-def equiv (α) [encodable α] : ulower α ≃ α :=
-(equiv_range_encode α).symm
--- { inv_fun := λ a : α, ⟨encode a, set.mem_range_self _⟩,
---   to_fun := λ n,
---     match decode α n.val with
---     | some a := a
---     | none := _
---     end,
---   --  option.get (show is_some (decode2 α n.1),
---   --   by cases n.2 with x hx; rw [← hx, encodek2]; exact rfl),
---   left_inv := λ a, by dsimp;
---     rw [← option.some_inj, option.some_get, encodek2],
---   right_inv := λ ⟨n, x, hx⟩, begin
---     apply subtype.eq,
---     dsimp,
---     conv {to_rhs, rw ← hx},
---     rw [encode_injective.eq_iff, ← option.some_inj, option.some_get, ← hx, encodek2],
---   end }
-
-instance {α} [encodable α] : decidable_eq (ulower α) :=
-by delta ulower; apply_instance
-
-local attribute [instance, priority 100]
-  encodable.decidable_range_encode encodable.decidable_eq_of_encodable
-
-instance {α} [primcodable α] : primcodable (ulower α) :=
-have primrec_pred (λ n, none ≠ encodable.decode2 α n),
-from primrec.not (primrec.eq.comp (primrec.const _) (primrec.option_bind primrec.decode
-  (primrec.ite (primrec.eq.comp (primrec.encode.comp primrec.snd) primrec.fst)
-    (primrec.option_some.comp primrec.snd) (primrec.const _)))),
-(primcodable.subtype $
-  primrec_pred.of_eq this $
-  by simp [set.range, option.eq_none_iff_forall_not_mem, encodable.mem_decode2,
-    show ∀ α (a : option α), none = a ↔ a = none, by intros; cc])
-
-#print ""
-
-set_option pp.proofs true
-@[simp] lemma equiv.computable (α) [primcodable α] : (equiv α).computable :=
-⟨show computable (λ n, _),
-begin
-end,
-show computable (λ n, _),
-from _⟩
-
-end ulower
-
 /-- A many-one degree is an equivalence class of sets up to many-one equivalence. -/
 def many_one_degree : Type 1 :=
 quotient $ show setoid (Σ α [primcodable α], set α), from
@@ -315,53 +265,68 @@ variables {α : Type u} [primcodable α]
 variables {β : Type v} [primcodable β]
 variables {γ : Type w} [primcodable γ]
 
-/--
-Computable and injective mapping of predicates to sets of natural numbers.
--/
-def to_nat (p : α → Prop) : ℕ → Prop :=
-λ n, p ((encodable.decode α n).get_or_else (default α))
-
-@[simp] lemma to_nat_injective {p q : α → Prop} : to_nat p = to_nat q ↔ p = q :=
-⟨begin
-  simp only [to_nat, ← iff_iff_eq, funext_iff, exists_prop_of_true],
-  intros h a,
-  simpa using h (encodable.encode a)
-end, by cc⟩
-
-@[simp] lemma many_one_reducible_to_nat (p : α → Prop) : p ≤₀ to_nat p :=
-⟨encodable.encode, computable.encode, by simp [to_nat]⟩
-
-@[simp] lemma to_nat_many_one_reducible (p : α → Prop) : to_nat p ≤₀ p :=
-⟨λ n, (encodable.decode α n).get_or_else (default α),
-  computable.option_get_or_else computable.decode (computable.const _),
-  by simp [to_nat, exists_prop_of_true]⟩
-
-@[simp] lemma many_one_equiv_to_nat (p : α → Prop) : many_one_equiv (to_nat p) p :=
-⟨to_nat_many_one_reducible _, many_one_reducible_to_nat _⟩
-
-@[simp] lemma many_one_reducible_to_nat_to_nat (p : α → Prop) (q : β → Prop) :
-  to_nat p ≤₀ to_nat q ↔ p ≤₀ q :=
-⟨λ pq, ((many_one_equiv_to_nat _).2.trans pq).trans (many_one_equiv_to_nat _).1,
- λ qp, ((many_one_equiv_to_nat _).1.trans qp).trans (many_one_equiv_to_nat _).2⟩
-
-@[simp] lemma many_one_equiv_to_nat_to_nat (p : α → Prop) (q : β → Prop) :
-  many_one_equiv (to_nat p) (to_nat q) ↔ many_one_equiv p q :=
-by simp [many_one_equiv]
-
-lemma many_one_equiv_ulower (p : α → Prop) : many_one_equiv (p ∘ ulower.equiv α) p :=
-many_one_equiv.of_equiv _
+lemma lower_pred_equiv {p : α → Prop} : many_one_equiv (p ∘ ulower.up) p :=
+many_one_equiv.of_equiv ulower.down_computable.symm
 
 /-- The many-one degree of a set on a inhabited type. -/
 def of (p : α → Prop) : many_one_degree :=
-quotient.mk' ⟨ulower α, by apply_instance, λ a, p (ulower.equiv α a)⟩
+quotient.mk' ⟨ulower α, by apply_instance, p ∘ ulower.up⟩
 
 @[elab_as_eliminator]
 protected lemma ind_on {C : many_one_degree → Prop} (d : many_one_degree)
   (h : ∀ (α : Type) [primcodable α] (p : α → Prop), C (of p)) : C d :=
-quotient.induction_on' d $ λ ⟨α, i, p⟩, by simpa using @h α i p
+quotient.induction_on' d $ λ ⟨α, i, p⟩, by exactI
+have (quotient.mk' ⟨α, ⟨i, p⟩⟩ : many_one_degree) = of p := quotient.eq'.2 lower_pred_equiv.symm,
+by simp [h, this]
+
+/--
+Lifts a function on sets of a primcodable type to many-one degrees.
+-/
+@[elab_as_eliminator, reducible]
+protected def lift_on {φ} (d : many_one_degree) (f : ∀ (α : Type) [primcodable α] (p : α → Prop), φ)
+  (h : ∀ α [primcodable α] (p : α → Prop) β [primcodable β] (q : β → Prop),
+    many_one_equiv p q → f α p = f β q) :
+  φ :=
+quotient.lift_on' d (λ ⟨α, _, p⟩, by exactI f α p)
+  (λ ⟨α, _, p⟩ ⟨β, _, q⟩ hpq, by exactI h _ _ _ _ hpq)
+
+@[simp]
+protected lemma lift_on_eq {φ}
+  (p : α → Prop) (f : ∀ (α : Type) [primcodable α] (p : α → Prop), φ)
+  (h : ∀ α [primcodable α] (p : α → Prop) β [primcodable β] (q : β → Prop),
+    many_one_equiv p q → f α p = f β q) :
+  (of p).lift_on f h = f (ulower α) (p ∘ ulower.up) :=
+rfl
+
+/--
+Lifts a binary function on sets of a primcodable type to many-one degrees.
+-/
+@[elab_as_eliminator, reducible, simp]
+protected def lift_on₂ {φ}
+  (d₁ d₂ : many_one_degree)
+  (f : ∀ (α : Type) [primcodable α] (p : α → Prop) (β : Type) [primcodable β] (q : β → Prop), φ)
+  (h :
+    ∀ α₁ [primcodable α₁] (p₁ : α₁ → Prop) β₁ [primcodable β₁] (q₁ : β₁ → Prop),
+    ∀ α₂ [primcodable α₂] (p₂ : α₂ → Prop) β₂ [primcodable β₂] (q₂ : β₂ → Prop),
+    many_one_equiv p₁ p₂ → many_one_equiv q₁ q₂ →
+    f α₁ p₁ β₁ q₁ = f α₂ p₂ β₂ q₂) :
+  φ :=
+d₁.lift_on (λ α _ p, d₂.lift_on (λ β _ q, by exactI f _ p _ q)
+  (λ _ _ _ _ _ _, by exactI h _ _ _ _ _ _ _ _ (many_one_equiv_refl _)))
+begin
+  introsI _ _ p₁ _ _ p₂ hp,
+  refine d₂.ind_on (λ _ _ p, _),
+  simp only [many_one_degree.lift_on_eq],
+  apply h,
+  assumption,
+  apply many_one_equiv_refl
+end
 
 @[simp] lemma of_eq_of {p : α → Prop} {q : β → Prop} : of p = of q ↔ many_one_equiv p q :=
-by simp [of, quotient.eq', many_one_equiv_to_nat_to_nat]
+suffices many_one_equiv (p ∘ ulower.up) (q ∘ ulower.up) ↔ many_one_equiv p q,
+by simpa [of, quotient.eq', many_one_degree],
+⟨λ h, (lower_pred_equiv.symm.trans h).trans lower_pred_equiv,
+ λ h, (lower_pred_equiv.trans h).trans lower_pred_equiv.symm⟩
 
 instance : inhabited many_one_degree := ⟨of (∅ : set ℕ)⟩
 
@@ -370,64 +335,72 @@ For many-one degrees `d₁` and `d₂`, `d₁ ≤ d₂` if the sets in `d₁` ar
 sets in `d₂`.
 -/
 instance : has_le many_one_degree :=
-⟨λ d₁ d₂, quotient.lift_on₂' d₁ d₂
-  (λ s t, s ≤₀ t)
-  (λ s₁ t₂ s₂ t₂ h₁ h₂, propext $ (h₁.le_congr_left).trans (h₂.le_congr_right))⟩
+⟨λ d₁ d₂, many_one_degree.lift_on₂ d₁ d₂
+  (λ _ _ s _ _ t, by exactI s ≤₀ t)
+  (λ _ _ s₁ _ _ t₂ _ _ s₂ _ _ t₂ h₁ h₂,
+    by exactI propext ((h₁.le_congr_left).trans (h₂.le_congr_right)))⟩
 
-@[simp] lemma of_le_of (p : α → Prop) (q : β → Prop) :
-  of p ≤ of q ↔ p ≤₀ q :=
-show to_nat p ≤₀ to_nat q ↔ p ≤₀ q, by simp
+@[simp] lemma of_le_of {p : α → Prop} {q : β → Prop} : of p ≤ of q ↔ p ≤₀ q :=
+lower_pred_equiv.le_congr_left.trans lower_pred_equiv.le_congr_right
 
 protected lemma le_refl (d : many_one_degree) : d ≤ d :=
-many_one_degree.ind_on d many_one_reducible_refl
+d.ind_on begin introsI _ _ p, rw of_le_of end
 
 protected lemma le_antisymm {d₁ d₂ : many_one_degree} : d₁ ≤ d₂ → d₂ ≤ d₁ → d₁ = d₂ :=
-many_one_degree.ind_on d₁ $ λ p,
-many_one_degree.ind_on d₂ $ λ q h₁ h₂,
-by simp only [*, many_one_equiv, of_le_of, of_eq_of, true_and] at *
+begin
+  induction d₁ using many_one_degree.ind_on,
+  induction d₂ using many_one_degree.ind_on,
+  intros hp hq,
+  simp only [*, many_one_equiv, of_le_of, of_eq_of, true_and] at *
+end
 
 protected lemma le_trans {d₁ d₂ d₃ : many_one_degree} :
   d₁ ≤ d₂ → d₂ ≤ d₃ → d₁ ≤ d₃ :=
-many_one_degree.ind_on d₁ $ λ a,
-many_one_degree.ind_on d₂ $ λ b,
-many_one_degree.ind_on d₃ $ λ c,
-many_one_reducible.trans
+begin
+  induction d₁ using many_one_degree.ind_on,
+  induction d₂ using many_one_degree.ind_on,
+  induction d₃ using many_one_degree.ind_on,
+  apply many_one_reducible.trans
+end
 
 instance : partial_order many_one_degree :=
-{ le_refl := many_one_degree.le_refl,
+{ le := (≤),
+  le_refl := many_one_degree.le_refl,
   le_trans := λ _ _ _, many_one_degree.le_trans,
-  le_antisymm := λ _ _, many_one_degree.le_antisymm,
-  ..many_one_degree.has_le }
+  le_antisymm := λ _ _, many_one_degree.le_antisymm }
 
 /-- The join of two degrees, induced by the disjoint union of two underlying sets. -/
 instance : has_add many_one_degree :=
-⟨λ d₁ d₂, quotient.lift_on₂' d₁ d₂ (λ a b, of (a ⊕' b)) $
-  λ a b c d ⟨hl₁, hr₁⟩ ⟨hl₂, hr₂⟩, quotient.sound' $
-    have many_one_equiv (a ⊕' b) (c ⊕' d),
-    from ⟨disjoin_many_one_reducible
+⟨λ d₁ d₂, many_one_degree.lift_on₂ d₁ d₂ (λ _ _ a _ _ b, by exactI of (a ⊕' b))
+  begin
+    introsI _ _ a _ _ b _ _ c _ _ d,
+    rintros ⟨hl₁, hr₁⟩ ⟨hl₂, hr₂⟩,
+    rw of_eq_of,
+    exact ⟨disjoin_many_one_reducible
         (hl₁.trans one_one_reducible.disjoin_left.to_many_one)
         (hl₂.trans one_one_reducible.disjoin_right.to_many_one),
       disjoin_many_one_reducible
         (hr₁.trans one_one_reducible.disjoin_left.to_many_one)
-        (hr₂.trans one_one_reducible.disjoin_right.to_many_one)⟩,
-    by simpa [setoid.r]⟩
+        (hr₂.trans one_one_reducible.disjoin_right.to_many_one)⟩
+  end⟩
 
-@[simp] lemma add_of (p : set α) (q : set β) :
-  of (p ⊕' q) = of p + of q :=
-quotient.eq'.2 $ (many_one_equiv_to_nat_to_nat _ _).2 $
+@[simp] lemma add_of (p : set α) (q : set β) : of (p ⊕' q) = of p + of q :=
+of_eq_of.2
 ⟨disjoin_many_one_reducible
-  ((many_one_reducible_to_nat _).trans one_one_reducible.disjoin_left.to_many_one)
-  ((many_one_reducible_to_nat _).trans one_one_reducible.disjoin_right.to_many_one),
+  (lower_pred_equiv.2.trans one_one_reducible.disjoin_left.to_many_one)
+  (lower_pred_equiv.2.trans one_one_reducible.disjoin_right.to_many_one),
  disjoin_many_one_reducible
-  ((to_nat_many_one_reducible _).trans one_one_reducible.disjoin_left.to_many_one)
-  ((to_nat_many_one_reducible _).trans one_one_reducible.disjoin_right.to_many_one)⟩
+  (lower_pred_equiv.1.trans one_one_reducible.disjoin_left.to_many_one)
+  (lower_pred_equiv.1.trans one_one_reducible.disjoin_right.to_many_one)⟩
 
 @[simp] theorem add_le {d₁ d₂ d₃ : many_one_degree} :
   d₁ + d₂ ≤ d₃ ↔ d₁ ≤ d₃ ∧ d₂ ≤ d₃ :=
-many_one_degree.ind_on d₁ $ λ p,
-many_one_degree.ind_on d₂ $ λ q,
-many_one_degree.ind_on d₃ $ λ r,
-by simpa only [of_le_of, ← add_of] using disjoin_le
+begin
+  induction d₁ using many_one_degree.ind_on,
+  induction d₂ using many_one_degree.ind_on,
+  induction d₃ using many_one_degree.ind_on,
+  simpa only [← add_of, of_le_of] using disjoin_le
+end
 
 @[simp] theorem le_add_left (d₁ d₂ : many_one_degree) : d₁ ≤ d₁ + d₂ :=
 (add_le.1 (le_refl _)).1
