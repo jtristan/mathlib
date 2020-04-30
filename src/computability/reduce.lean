@@ -249,14 +249,71 @@ theorem disjoin_le {α β γ} [primcodable α] [primcodable β] [primcodable γ]
   one_one_reducible.disjoin_right.to_many_one.trans h⟩,
  λ ⟨h₁, h₂⟩, disjoin_many_one_reducible h₁ h₂⟩
 
+def ulower (α : Type u) [encodable α] : Type :=
+set.range (encodable.encode : α → ℕ)
+
+namespace ulower
+open encodable
+
+def equiv (α) [encodable α] : ulower α ≃ α :=
+(equiv_range_encode α).symm
+-- { inv_fun := λ a : α, ⟨encode a, set.mem_range_self _⟩,
+--   to_fun := λ n,
+--     match decode α n.val with
+--     | some a := a
+--     | none := _
+--     end,
+--   --  option.get (show is_some (decode2 α n.1),
+--   --   by cases n.2 with x hx; rw [← hx, encodek2]; exact rfl),
+--   left_inv := λ a, by dsimp;
+--     rw [← option.some_inj, option.some_get, encodek2],
+--   right_inv := λ ⟨n, x, hx⟩, begin
+--     apply subtype.eq,
+--     dsimp,
+--     conv {to_rhs, rw ← hx},
+--     rw [encode_injective.eq_iff, ← option.some_inj, option.some_get, ← hx, encodek2],
+--   end }
+
+instance {α} [encodable α] : decidable_eq (ulower α) :=
+by delta ulower; apply_instance
+
+local attribute [instance, priority 100]
+  encodable.decidable_range_encode encodable.decidable_eq_of_encodable
+
+instance {α} [primcodable α] : primcodable (ulower α) :=
+have primrec_pred (λ n, none ≠ encodable.decode2 α n),
+from primrec.not (primrec.eq.comp (primrec.const _) (primrec.option_bind primrec.decode
+  (primrec.ite (primrec.eq.comp (primrec.encode.comp primrec.snd) primrec.fst)
+    (primrec.option_some.comp primrec.snd) (primrec.const _)))),
+(primcodable.subtype $
+  primrec_pred.of_eq this $
+  by simp [set.range, option.eq_none_iff_forall_not_mem, encodable.mem_decode2,
+    show ∀ α (a : option α), none = a ↔ a = none, by intros; cc])
+
+#print ""
+
+set_option pp.proofs true
+@[simp] lemma equiv.computable (α) [primcodable α] : (equiv α).computable :=
+⟨show computable (λ n, _),
+begin
+end,
+show computable (λ n, _),
+from _⟩
+
+end ulower
+
 /-- A many-one degree is an equivalence class of sets up to many-one equivalence. -/
-def many_one_degree : Type :=
-quotient ⟨(many_one_equiv : set ℕ → set ℕ → Prop), equivalence_of_many_one_equiv⟩
+def many_one_degree : Type 1 :=
+quotient $ show setoid (Σ α [primcodable α], set α), from
+setoid.mk (λ ⟨α, _, a⟩ ⟨β, _, b⟩, by exactI many_one_equiv a b)
+  ⟨λ ⟨_, _, a⟩, by exactI many_one_equiv_refl _,
+   λ ⟨_, _, _⟩ ⟨_, _, b⟩ h, by exactI h.symm,
+   λ ⟨_, _, a⟩ ⟨_, _, b⟩ ⟨_, _, c⟩ hab hbc, by exactI hab.trans hbc⟩
 
 namespace many_one_degree
-variables {α : Type u} [primcodable α] [inhabited α]
-variables {β : Type v} [primcodable β] [inhabited β]
-variables {γ : Type w} [primcodable γ] [inhabited γ]
+variables {α : Type u} [primcodable α]
+variables {β : Type v} [primcodable β]
+variables {γ : Type w} [primcodable γ]
 
 /--
 Computable and injective mapping of predicates to sets of natural numbers.
@@ -291,14 +348,17 @@ end, by cc⟩
   many_one_equiv (to_nat p) (to_nat q) ↔ many_one_equiv p q :=
 by simp [many_one_equiv]
 
+lemma many_one_equiv_ulower (p : α → Prop) : many_one_equiv (p ∘ ulower.equiv α) p :=
+many_one_equiv.of_equiv _
+
 /-- The many-one degree of a set on a inhabited type. -/
 def of (p : α → Prop) : many_one_degree :=
-quotient.mk' (to_nat p)
+quotient.mk' ⟨ulower α, by apply_instance, λ a, p (ulower.equiv α a)⟩
 
 @[elab_as_eliminator]
 protected lemma ind_on {C : many_one_degree → Prop} (d : many_one_degree)
-  (h : ∀ p : ℕ → Prop, C (of p)) : C d :=
-quotient.induction_on' d h
+  (h : ∀ (α : Type) [primcodable α] (p : α → Prop), C (of p)) : C d :=
+quotient.induction_on' d $ λ ⟨α, i, p⟩, by simpa using @h α i p
 
 @[simp] lemma of_eq_of {p : α → Prop} {q : β → Prop} : of p = of q ↔ many_one_equiv p q :=
 by simp [of, quotient.eq', many_one_equiv_to_nat_to_nat]

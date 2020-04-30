@@ -1064,6 +1064,20 @@ begin
   simp, cases f a; refl
 end
 
+-- set_option pp.all true
+theorem subtype_mk {p : β → Prop} [decidable_pred p] {hp : primrec_pred p}
+  {f : α → β} {h : ∀ a, p (f a)} :
+  primrec f →
+  by haveI := primcodable.subtype hp; exact
+  primrec (λ a, @subtype.mk β p (f a) (h a)) :=
+begin
+  letI := primcodable.subtype hp,
+  intro,
+  refine (primcodable.prim (subtype p)).of_eq (λ n, _),
+  dsimp [_inst, encodable.decode, primcodable.subtype, decode_subtype, option.map],
+  -- rcases decode (subtype p) n with _|⟨a,h⟩; refl
+end
+
 theorem fin_val_iff {n} {f : α → fin n} :
   primrec (λ a, (f a).1) ↔ primrec f :=
 begin
