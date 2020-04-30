@@ -253,9 +253,9 @@ theorem disjoin_le {α β γ} [primcodable α] [primcodable β] [primcodable γ]
  λ ⟨h₁, h₂⟩, disjoin_many_one_reducible h₁ h₂⟩
 
 /-- A many-one degree is an equivalence class of sets up to many-one equivalence. -/
-def many_one_degree : Type 1 :=
-quotient $ show setoid (Σ α [primcodable α], set α), from
-setoid.mk (λ ⟨α, _, a⟩ ⟨β, _, b⟩, by exactI many_one_equiv a b)
+def many_one_degree : Type :=
+quotient $ show setoid (Σ (A : set ℕ) [primcodable A], set A), from
+setoid.mk (λ ⟨_, _, p⟩ ⟨_, _, q⟩, by exactI many_one_equiv p q)
   ⟨λ ⟨_, _, a⟩, by exactI many_one_equiv_refl _,
    λ ⟨_, _, _⟩ ⟨_, _, b⟩ h, by exactI h.symm,
    λ ⟨_, _, a⟩ ⟨_, _, b⟩ ⟨_, _, c⟩ hab hbc, by exactI hab.trans hbc⟩
@@ -270,7 +270,7 @@ many_one_equiv.of_equiv ulower.down_computable.symm
 
 /-- The many-one degree of a set on a inhabited type. -/
 def of (p : α → Prop) : many_one_degree :=
-quotient.mk' ⟨ulower α, by apply_instance, p ∘ ulower.up⟩
+quotient.mk' ⟨_, primcodable.ulower, p ∘ ulower.up⟩
 
 @[elab_as_eliminator]
 protected lemma ind_on {C : many_one_degree → Prop} (d : many_one_degree)
@@ -385,13 +385,14 @@ instance : has_add many_one_degree :=
   end⟩
 
 @[simp] lemma add_of (p : set α) (q : set β) : of (p ⊕' q) = of p + of q :=
-of_eq_of.2
-⟨disjoin_many_one_reducible
-  (lower_pred_equiv.2.trans one_one_reducible.disjoin_left.to_many_one)
-  (lower_pred_equiv.2.trans one_one_reducible.disjoin_right.to_many_one),
- disjoin_many_one_reducible
-  (lower_pred_equiv.1.trans one_one_reducible.disjoin_left.to_many_one)
-  (lower_pred_equiv.1.trans one_one_reducible.disjoin_right.to_many_one)⟩
+have many_one_equiv (p ⊕' q) ((p ∘ ulower.up) ⊕' (q ∘ ulower.up)), from
+  ⟨disjoin_many_one_reducible
+    (lower_pred_equiv.2.trans one_one_reducible.disjoin_left.to_many_one)
+    (lower_pred_equiv.2.trans one_one_reducible.disjoin_right.to_many_one),
+  disjoin_many_one_reducible
+    (lower_pred_equiv.1.trans one_one_reducible.disjoin_left.to_many_one)
+    (lower_pred_equiv.1.trans one_one_reducible.disjoin_right.to_many_one)⟩,
+by simpa [(+)]
 
 @[simp] theorem add_le {d₁ d₂ d₃ : many_one_degree} :
   d₁ + d₂ ≤ d₃ ↔ d₁ ≤ d₃ ∧ d₂ ≤ d₃ :=
